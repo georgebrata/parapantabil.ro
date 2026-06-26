@@ -601,10 +601,10 @@ function WeatherPanels({
           onChange={(_, nextValue) => setActiveTab(nextValue)}
           variant="scrollable"
           scrollButtons="auto"
-          TabIndicatorProps={{ sx: { display: "none" } }}
           sx={{
             position: "relative",
             zIndex: 1,
+            "& .MuiTabs-indicator": { display: "none" },
             "& .MuiTabs-flexContainer": { gap: 0.75 },
             "& .MuiTab-root.Mui-selected": {
               color: "#041116 !important",
