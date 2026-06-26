@@ -1,6 +1,6 @@
 :root {
-  --background: #f5f7f4;
-  --foreground: #17201d;
+  --background: #04070f;
+  --foreground: #f5fbff;
 }
 
 * {
@@ -9,6 +9,7 @@
 
 html {
   background: var(--background);
+  color-scheme: dark;
 }
 
 body {
@@ -23,4 +24,9 @@ body {
 
 a {
   color: inherit;
+}
+
+::selection {
+  background: rgba(97, 244, 222, 0.32);
+  color: #ffffff;
 }
