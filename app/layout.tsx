@@ -2,12 +2,19 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Paraglider Weather Check",
+  title: "Parapantabil.ro | Verificare meteo de zbor",
   description:
-    "Current and forecast flight suitability checks for manual paragliding.",
+    "Consolă meteo în limba română pentru verificarea condițiilor parapantabile.",
   icons: {
-    icon: "/favicon.svg",
-    shortcut: "/favicon.svg",
+    icon: "/parapantabil-logo.png",
+    shortcut: "/parapantabil-logo.png",
+    apple: "/parapantabil-logo.png",
+  },
+  openGraph: {
+    title: "Parapantabil.ro | Verificare meteo de zbor",
+    description:
+      "Consolă meteo în limba română pentru verificarea condițiilor parapantabile.",
+    images: ["/parapantabil-logo.png"],
   },
 };
 
@@ -17,7 +24,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="ro">
       <body>{children}</body>
     </html>
   );
