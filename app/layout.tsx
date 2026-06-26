@@ -6,8 +6,15 @@ export const metadata: Metadata = {
   description:
     "Consolă meteo în limba română pentru verificarea condițiilor parapantabile.",
   icons: {
-    icon: "/favicon.svg",
-    shortcut: "/favicon.svg",
+    icon: "/parapantabil-logo.png",
+    shortcut: "/parapantabil-logo.png",
+    apple: "/parapantabil-logo.png",
+  },
+  openGraph: {
+    title: "Parapantabil.ro | Verificare meteo de zbor",
+    description:
+      "Consolă meteo în limba română pentru verificarea condițiilor parapantabile.",
+    images: ["/parapantabil-logo.png"],
   },
 };
 

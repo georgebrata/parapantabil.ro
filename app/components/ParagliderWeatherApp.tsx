@@ -1,7 +1,6 @@
 "use client";
 
 import AirIcon from "@mui/icons-material/Air";
-import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import CloudIcon from "@mui/icons-material/Cloud";
 import DataUsageIcon from "@mui/icons-material/DataUsage";
 import DeviceThermostatIcon from "@mui/icons-material/DeviceThermostat";
@@ -10,7 +9,6 @@ import LocationSearchingIcon from "@mui/icons-material/LocationSearching";
 import MyLocationIcon from "@mui/icons-material/MyLocation";
 import NavigationIcon from "@mui/icons-material/Navigation";
 import PlaceIcon from "@mui/icons-material/Place";
-import RadarIcon from "@mui/icons-material/Radar";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SatelliteAltIcon from "@mui/icons-material/SatelliteAlt";
 import SensorsIcon from "@mui/icons-material/Sensors";
@@ -138,6 +136,8 @@ const defaultSources = [
   "Open-Meteo Air Quality",
   "Open-Meteo Geocoding",
 ];
+
+const LOGO_SRC = "/parapantabil-logo.png";
 
 const toneByStatus: Record<
   FlightStatus,
@@ -450,23 +450,36 @@ function HeaderPanel({
       >
         <Stack spacing={1.4}>
           <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>
-            <Chip icon={<AutoAwesomeIcon />} size="small" label="Parapantabil OS" />
+            <Chip icon={<LogoMark size={18} />} size="small" label="Parapantabil OS" />
             {sourceChips.map((source) => (
               <Chip key={source} size="small" label={romanianSource(source)} />
             ))}
           </Stack>
+          <Box
+            sx={{
+              display: "grid",
+              gap: { xs: 1.4, sm: 1.8 },
+              gridTemplateColumns: { xs: "76px 1fr", sm: "96px 1fr" },
+              alignItems: "center",
+              maxWidth: 820,
+            }}
+          >
+            <LogoBeacon />
+            <Box sx={{ minWidth: 0 }}>
+              <Typography
+                component="h1"
+                variant="h1"
+                sx={{
+                  maxWidth: 720,
+                  overflowWrap: "anywhere",
+                  textShadow: "0 0 34px rgba(97,244,222,0.22)",
+                }}
+              >
+                Parapantabil?
+              </Typography>
+            </Box>
+          </Box>
           <Box>
-            <Typography
-              component="h1"
-              variant="h1"
-              sx={{
-                maxWidth: 720,
-                overflowWrap: "anywhere",
-                textShadow: "0 0 34px rgba(97,244,222,0.22)",
-              }}
-            >
-              Parapantabil?
-            </Typography>
             <Typography sx={{ mt: 0.8, maxWidth: 760, color: "text.secondary" }}>
               Consolă meteo pentru piloți parapantă: vânt, rafale, vizibilitate, instabilitate și fereastră
               de lansare citite ca un singur semnal.
@@ -775,7 +788,7 @@ function EmptyLocationPanel({
       >
         <Stack spacing={2.1} sx={{ order: { xs: 2, md: 1 }, maxWidth: 560 }}>
           <Chip
-            icon={<RadarIcon />}
+            icon={<LogoMark size={18} />}
             label="sistem în așteptare"
             sx={{ alignSelf: "flex-start", color: "#bffcff" }}
           />
@@ -1535,6 +1548,63 @@ function PanelShell({ children, sx = {} }: { children: ReactNode; sx?: object })
   return <Box sx={{ ...glassPanel, ...sx }}>{children}</Box>;
 }
 
+function LogoMark({ size = 24 }: { size?: number }) {
+  return (
+    <Box
+      component="img"
+      src={LOGO_SRC}
+      alt=""
+      aria-hidden="true"
+      sx={{
+        width: size,
+        height: size,
+        objectFit: "contain",
+        filter: "drop-shadow(0 0 8px rgba(97,244,222,0.46))",
+      }}
+    />
+  );
+}
+
+function LogoBeacon() {
+  return (
+    <Box
+      aria-hidden="true"
+      sx={{
+        width: { xs: 76, sm: 96 },
+        height: { xs: 76, sm: 96 },
+        borderRadius: "50%",
+        display: "grid",
+        placeItems: "center",
+        position: "relative",
+        background:
+          "radial-gradient(circle at 50% 50%, rgba(97,244,222,0.16), rgba(2,8,18,0.82) 68%)",
+        boxShadow: "0 0 34px rgba(97,244,222,0.24), inset 0 0 22px rgba(0,0,0,0.55)",
+        "&::before": {
+          content: '""',
+          position: "absolute",
+          inset: -6,
+          borderRadius: "50%",
+          border: "1px solid rgba(97,244,222,0.28)",
+          borderTopColor: "rgba(255,209,102,0.72)",
+          animation: "orbit 11s linear infinite",
+        },
+      }}
+    >
+      <Box
+        component="img"
+        src={LOGO_SRC}
+        alt=""
+        sx={{
+          width: { xs: 64, sm: 82 },
+          height: { xs: 64, sm: 82 },
+          objectFit: "contain",
+          filter: "drop-shadow(0 0 12px rgba(77,255,165,0.36))",
+        }}
+      />
+    </Box>
+  );
+}
+
 function DashboardSkeleton() {
   return (
     <Stack spacing={2}>
@@ -1546,7 +1616,10 @@ function DashboardSkeleton() {
         }}
       >
         <PanelShell sx={{ p: 2, minHeight: 356 }}>
-          <Skeleton variant="rounded" height={286} sx={skeletonSx} />
+          <Stack spacing={2} sx={{ alignItems: "center", justifyContent: "center", minHeight: 286 }}>
+            <LogoBeacon />
+            <Skeleton variant="rounded" height={92} width="100%" sx={skeletonSx} />
+          </Stack>
         </PanelShell>
         <PanelShell sx={{ p: 2, minHeight: 356 }}>
           <Skeleton variant="rounded" height={286} sx={skeletonSx} />
@@ -1620,15 +1693,19 @@ function HolographicLaunchMap() {
           />
         ))}
 
-        <g style={{ animation: "floatWing 6.6s ease-in-out infinite" }}>
-          <path d="M132 178 C198 78 494 78 552 178 C432 146 266 146 132 178 Z" fill="url(#holoWing)" opacity="0.94" />
-          <path d="M178 158 C236 126 448 126 508 158" fill="none" stroke="#ffffff" strokeOpacity="0.52" strokeLinecap="round" strokeWidth="7" />
-          <path d="M132 178 C262 154 430 154 552 178" fill="none" stroke="#020812" strokeOpacity="0.22" strokeWidth="5" />
-          <path d="M268 176 L318 300 M418 176 L368 300" stroke="#dffcff" strokeOpacity="0.52" strokeLinecap="round" strokeWidth="2" />
-          <path d="M318 302 C334 276 360 276 376 302" fill="none" stroke="#dffcff" strokeLinecap="round" strokeWidth="7" />
-          <ellipse cx="348" cy="318" rx="32" ry="12" fill="#dffcff" opacity="0.88" />
-          <circle cx="348" cy="276" r="12" fill="#ffd166" />
-        </g>
+        <image
+          href={LOGO_SRC}
+          x="188"
+          y="82"
+          width="304"
+          height="304"
+          preserveAspectRatio="xMidYMid meet"
+          style={{
+            animation: "floatWing 6.6s ease-in-out infinite",
+            filter:
+              "drop-shadow(0 0 32px rgba(97,244,222,0.44)) drop-shadow(0 20px 36px rgba(0,0,0,0.36))",
+          }}
+        />
 
         <g opacity="0.55">
           <circle cx="348" cy="288" r="140" fill="none" stroke="#61f4de" strokeOpacity="0.22" />
