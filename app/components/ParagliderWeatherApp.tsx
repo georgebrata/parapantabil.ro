@@ -3,8 +3,10 @@
 import AirIcon from "@mui/icons-material/Air";
 import CloudIcon from "@mui/icons-material/Cloud";
 import DataUsageIcon from "@mui/icons-material/DataUsage";
+import DarkModeIcon from "@mui/icons-material/DarkMode";
 import DeviceThermostatIcon from "@mui/icons-material/DeviceThermostat";
 import KeyboardCommandKeyIcon from "@mui/icons-material/KeyboardCommandKey";
+import LightModeIcon from "@mui/icons-material/LightMode";
 import LocationSearchingIcon from "@mui/icons-material/LocationSearching";
 import MyLocationIcon from "@mui/icons-material/MyLocation";
 import NavigationIcon from "@mui/icons-material/Navigation";
@@ -28,6 +30,7 @@ import {
   Chip,
   CircularProgress,
   CssBaseline,
+  IconButton,
   LinearProgress,
   Skeleton,
   Stack,
@@ -37,10 +40,10 @@ import {
   ThemeProvider,
   Tooltip,
   Typography,
-  createTheme,
 } from "@mui/material";
+import { alpha, createTheme, type Theme, useTheme } from "@mui/material/styles";
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import {
   CurrentSnapshot,
   DayForecast,
@@ -59,77 +62,93 @@ import {
   windDirectionLabel,
 } from "../lib/weather";
 
-const theme = createTheme({
-  palette: {
-    mode: "dark",
-    primary: { main: "#61f4de" },
-    secondary: { main: "#ffd166" },
-    error: { main: "#ff5c7a" },
-    success: { main: "#4dffa5" },
-    warning: { main: "#ffd166" },
-    background: { default: "#04070f", paper: "rgba(9, 16, 32, 0.76)" },
-    text: { primary: "#f5fbff", secondary: "#9fb2c5" },
-  },
-  shape: { borderRadius: 8 },
-  typography: {
-    fontFamily:
-      'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-    h1: { fontSize: "2.85rem", lineHeight: 1.02, fontWeight: 820, letterSpacing: 0 },
-    h2: { fontSize: "1.72rem", lineHeight: 1.12, fontWeight: 780, letterSpacing: 0 },
-    h3: { fontSize: "1.04rem", lineHeight: 1.18, fontWeight: 760, letterSpacing: 0 },
-    body1: { lineHeight: 1.58 },
-    body2: { lineHeight: 1.48 },
-    button: { textTransform: "none", fontWeight: 760, letterSpacing: 0 },
-  },
-  components: {
-    MuiCssBaseline: {
-      styleOverrides: {
-        body: {
-          background: "#04070f",
-        },
+type ThemeMode = "dark" | "light";
+
+const THEME_STORAGE_KEY = "parapantabil-theme";
+const themeModeListeners = new Set<() => void>();
+let memoryThemeMode: ThemeMode | null = null;
+
+function createAppTheme(mode: ThemeMode) {
+  const isLight = mode === "light";
+
+  return createTheme({
+    palette: {
+      mode,
+      primary: { main: isLight ? "#087f82" : "#61f4de" },
+      secondary: { main: isLight ? "#b97800" : "#ffd166" },
+      error: { main: isLight ? "#c93858" : "#ff5c7a" },
+      success: { main: isLight ? "#087f5b" : "#4dffa5" },
+      warning: { main: isLight ? "#ad7300" : "#ffd166" },
+      background: {
+        default: isLight ? "#f6fbff" : "#04070f",
+        paper: isLight ? "rgba(255, 255, 255, 0.76)" : "rgba(9, 16, 32, 0.76)",
+      },
+      text: {
+        primary: isLight ? "#102033" : "#f5fbff",
+        secondary: isLight ? "#526579" : "#9fb2c5",
       },
     },
-    MuiButton: {
-      styleOverrides: {
-        root: {
-          borderRadius: 8,
-          minHeight: 42,
+    shape: { borderRadius: 8 },
+    typography: {
+      fontFamily:
+        'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      h1: { fontSize: "2.85rem", lineHeight: 1.02, fontWeight: 820, letterSpacing: 0 },
+      h2: { fontSize: "1.72rem", lineHeight: 1.12, fontWeight: 780, letterSpacing: 0 },
+      h3: { fontSize: "1.04rem", lineHeight: 1.18, fontWeight: 760, letterSpacing: 0 },
+      body1: { lineHeight: 1.58 },
+      body2: { lineHeight: 1.48 },
+      button: { textTransform: "none", fontWeight: 760, letterSpacing: 0 },
+    },
+    components: {
+      MuiCssBaseline: {
+        styleOverrides: {
+          body: {
+            background: isLight ? "#f6fbff" : "#04070f",
+          },
         },
       },
-    },
-    MuiChip: {
-      styleOverrides: {
-        root: {
-          borderRadius: 8,
-          borderColor: "rgba(255,255,255,0.14)",
-          background: "rgba(255,255,255,0.07)",
-          color: "#dff8ff",
-        },
-      },
-    },
-    MuiTab: {
-      styleOverrides: {
-        root: {
-          borderRadius: 8,
-          color: "#9fb2c5",
-          fontWeight: 800,
-          minHeight: 48,
-          textTransform: "none",
-        },
-      },
-    },
-    MuiTextField: {
-      styleOverrides: {
-        root: {
-          "& .MuiOutlinedInput-root": {
+      MuiButton: {
+        styleOverrides: {
+          root: {
             borderRadius: 8,
-            background: "rgba(2, 8, 18, 0.58)",
+            minHeight: 42,
+          },
+        },
+      },
+      MuiChip: {
+        styleOverrides: {
+          root: {
+            borderRadius: 8,
+            borderColor: isLight ? "rgba(8, 127, 130, 0.18)" : "rgba(255,255,255,0.14)",
+            background: isLight ? "rgba(255,255,255,0.64)" : "rgba(255,255,255,0.07)",
+            color: isLight ? "#18344a" : "#dff8ff",
+          },
+        },
+      },
+      MuiTab: {
+        styleOverrides: {
+          root: {
+            borderRadius: 8,
+            color: isLight ? "#526579" : "#9fb2c5",
+            fontWeight: 800,
+            minHeight: 48,
+            textTransform: "none",
+          },
+        },
+      },
+      MuiTextField: {
+        styleOverrides: {
+          root: {
+            "& .MuiOutlinedInput-root": {
+              borderRadius: 8,
+              background: isLight ? "rgba(255,255,255,0.78)" : "rgba(2, 8, 18, 0.58)",
+            },
           },
         },
       },
     },
-  },
-});
+  });
+}
 
 const defaultSources = [
   "Open-Meteo Forecast",
@@ -139,38 +158,66 @@ const defaultSources = [
 
 const LOGO_SRC = "/parapantabil-logo.png";
 
-const toneByStatus: Record<
-  FlightStatus,
-  {
-    color: string;
-    dim: string;
-    glow: string;
-    gradient: string;
-    label: string;
-  }
-> = {
-  good: {
-    color: "#4dffa5",
-    dim: "rgba(77, 255, 165, 0.14)",
-    glow: "rgba(77, 255, 165, 0.36)",
-    gradient: "linear-gradient(135deg, rgba(77,255,165,0.24), rgba(97,244,222,0.08))",
-    label: "fereastră bună",
+type StatusTone = {
+  color: string;
+  dim: string;
+  glow: string;
+  gradient: string;
+  label: string;
+};
+
+const toneByMode: Record<ThemeMode, Record<FlightStatus, StatusTone>> = {
+  dark: {
+    good: {
+      color: "#4dffa5",
+      dim: "rgba(77, 255, 165, 0.14)",
+      glow: "rgba(77, 255, 165, 0.36)",
+      gradient: "linear-gradient(135deg, rgba(77,255,165,0.24), rgba(97,244,222,0.08))",
+      label: "fereastră bună",
+    },
+    marginal: {
+      color: "#ffd166",
+      dim: "rgba(255, 209, 102, 0.15)",
+      glow: "rgba(255, 209, 102, 0.32)",
+      gradient: "linear-gradient(135deg, rgba(255,209,102,0.23), rgba(255,121,94,0.08))",
+      label: "la limită",
+    },
+    "no-go": {
+      color: "#ff5c7a",
+      dim: "rgba(255, 92, 122, 0.15)",
+      glow: "rgba(255, 92, 122, 0.34)",
+      gradient: "linear-gradient(135deg, rgba(255,92,122,0.24), rgba(255,209,102,0.06))",
+      label: "nu lansa",
+    },
   },
-  marginal: {
-    color: "#ffd166",
-    dim: "rgba(255, 209, 102, 0.15)",
-    glow: "rgba(255, 209, 102, 0.32)",
-    gradient: "linear-gradient(135deg, rgba(255,209,102,0.23), rgba(255,121,94,0.08))",
-    label: "la limită",
-  },
-  "no-go": {
-    color: "#ff5c7a",
-    dim: "rgba(255, 92, 122, 0.15)",
-    glow: "rgba(255, 92, 122, 0.34)",
-    gradient: "linear-gradient(135deg, rgba(255,92,122,0.24), rgba(255,209,102,0.06))",
-    label: "nu lansa",
+  light: {
+    good: {
+      color: "#047857",
+      dim: "rgba(4, 120, 87, 0.13)",
+      glow: "rgba(4, 120, 87, 0.22)",
+      gradient: "linear-gradient(135deg, rgba(34,197,143,0.22), rgba(8,127,130,0.1))",
+      label: "fereastră bună",
+    },
+    marginal: {
+      color: "#a16207",
+      dim: "rgba(161, 98, 7, 0.14)",
+      glow: "rgba(217, 119, 6, 0.22)",
+      gradient: "linear-gradient(135deg, rgba(245,158,11,0.22), rgba(251,146,60,0.1))",
+      label: "la limită",
+    },
+    "no-go": {
+      color: "#be123c",
+      dim: "rgba(190, 18, 60, 0.13)",
+      glow: "rgba(190, 18, 60, 0.2)",
+      gradient: "linear-gradient(135deg, rgba(244,63,94,0.18), rgba(245,158,11,0.08))",
+      label: "nu lansa",
+    },
   },
 };
+
+function statusTone(status: FlightStatus, mode: Theme["palette"]["mode"]) {
+  return toneByMode[mode][status];
+}
 
 const shellMotion = {
   "@keyframes gridDrift": {
@@ -212,26 +259,119 @@ const shellMotion = {
   },
 };
 
-const glassPanel = {
-  position: "relative",
-  overflow: "hidden",
-  border: "1px solid rgba(141, 245, 255, 0.18)",
-  borderRadius: 2,
-  background:
-    "linear-gradient(145deg, rgba(10, 20, 38, 0.86), rgba(5, 11, 24, 0.7) 56%, rgba(13, 39, 46, 0.62))",
-  boxShadow:
-    "0 26px 80px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.08)",
-  backdropFilter: "blur(26px)",
-  "&::before": {
-    content: '""',
-    position: "absolute",
-    inset: 0,
-    pointerEvents: "none",
-    background:
-      "linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.06) 36%, transparent 58%)",
-    opacity: 0.56,
-  },
-};
+function glassPanel(theme: Theme) {
+  const isLight = theme.palette.mode === "light";
+
+  return {
+    position: "relative",
+    overflow: "hidden",
+    border: `1px solid ${isLight ? "rgba(8, 127, 130, 0.18)" : "rgba(141, 245, 255, 0.18)"}`,
+    borderRadius: 2,
+    background: isLight
+      ? "linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(238, 249, 252, 0.74) 56%, rgba(224, 245, 242, 0.68))"
+      : "linear-gradient(145deg, rgba(10, 20, 38, 0.86), rgba(5, 11, 24, 0.7) 56%, rgba(13, 39, 46, 0.62))",
+    boxShadow: isLight
+      ? "0 26px 80px rgba(7, 52, 74, 0.13), inset 0 1px 0 rgba(255, 255, 255, 0.72)"
+      : "0 26px 80px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.08)",
+    backdropFilter: "blur(26px)",
+    "&::before": {
+      content: '""',
+      position: "absolute",
+      inset: 0,
+      pointerEvents: "none",
+      background: isLight
+        ? "linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.58) 36%, transparent 58%)"
+        : "linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.06) 36%, transparent 58%)",
+      opacity: isLight ? 0.72 : 0.56,
+    },
+  };
+}
+
+function appShellSx(theme: Theme) {
+  const isLight = theme.palette.mode === "light";
+
+  return {
+    position: "relative",
+    minHeight: "100vh",
+    color: "text.primary",
+    background: isLight
+      ? "radial-gradient(circle at 18% 0%, rgba(8, 127, 130, 0.16), transparent 26%), radial-gradient(circle at 78% 16%, rgba(255, 209, 102, 0.18), transparent 24%), linear-gradient(180deg, #f6fbff 0%, #edf8fb 48%, #fbfdff 100%)"
+      : "radial-gradient(circle at 18% 0%, rgba(97, 244, 222, 0.2), transparent 26%), radial-gradient(circle at 78% 16%, rgba(255, 92, 122, 0.14), transparent 24%), linear-gradient(180deg, #04070f 0%, #07111f 48%, #03060d 100%)",
+    isolation: "isolate",
+    ...shellMotion,
+    "&::before": {
+      content: '""',
+      position: "fixed",
+      inset: 0,
+      zIndex: -2,
+      backgroundImage: isLight
+        ? "linear-gradient(rgba(8,127,130,0.095) 1px, transparent 1px), linear-gradient(90deg, rgba(8,127,130,0.095) 1px, transparent 1px)"
+        : "linear-gradient(rgba(97,244,222,0.065) 1px, transparent 1px), linear-gradient(90deg, rgba(97,244,222,0.065) 1px, transparent 1px)",
+      backgroundSize: "42px 42px",
+      maskImage: isLight
+        ? "linear-gradient(180deg, rgba(0,0,0,0.68), rgba(0,0,0,0.08))"
+        : "linear-gradient(180deg, rgba(0,0,0,0.9), rgba(0,0,0,0.18))",
+      animation: "gridDrift 22s linear infinite",
+    },
+    "&::after": {
+      content: '""',
+      position: "fixed",
+      inset: "-18% -10% auto -10%",
+      height: "64vh",
+      zIndex: -1,
+      background: isLight
+        ? "radial-gradient(ellipse at 32% 38%, rgba(34,197,143,0.18), transparent 48%), radial-gradient(ellipse at 68% 24%, rgba(8,127,130,0.16), transparent 46%)"
+        : "radial-gradient(ellipse at 32% 38%, rgba(77,255,165,0.16), transparent 48%), radial-gradient(ellipse at 68% 24%, rgba(97,244,222,0.18), transparent 46%)",
+      filter: "blur(34px)",
+      animation: "aurora 12s ease-in-out infinite",
+    },
+  };
+}
+
+function readInitialThemeMode(): ThemeMode {
+  if (memoryThemeMode) return memoryThemeMode;
+  if (typeof window === "undefined") return "dark";
+
+  try {
+    const storedMode = window.localStorage.getItem(THEME_STORAGE_KEY);
+    if (storedMode === "dark" || storedMode === "light") return storedMode;
+    return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  } catch {
+    return "dark";
+  }
+}
+
+function subscribeThemeMode(listener: () => void) {
+  if (typeof window === "undefined") return () => undefined;
+
+  themeModeListeners.add(listener);
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key === THEME_STORAGE_KEY) listener();
+  };
+
+  window.addEventListener("storage", handleStorage);
+
+  return () => {
+    themeModeListeners.delete(listener);
+    window.removeEventListener("storage", handleStorage);
+  };
+}
+
+function getServerThemeMode(): ThemeMode {
+  return "dark";
+}
+
+function writeThemeMode(mode: ThemeMode) {
+  memoryThemeMode = mode;
+
+  try {
+    window.localStorage.setItem(THEME_STORAGE_KEY, mode);
+  } catch {
+    // Theme persistence is a convenience; the UI still works without storage.
+  }
+
+  themeModeListeners.forEach((listener) => listener());
+}
 
 export default function ParagliderWeatherApp() {
   const [queryClient] = useState(
@@ -242,18 +382,42 @@ export default function ParagliderWeatherApp() {
         },
       }),
   );
+  const themeMode = useSyncExternalStore(
+    subscribeThemeMode,
+    readInitialThemeMode,
+    getServerThemeMode,
+  );
+  const theme = useMemo(() => createAppTheme(themeMode), [themeMode]);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = themeMode;
+    document.documentElement.style.colorScheme = themeMode;
+  }, [themeMode]);
+
+  const toggleThemeMode = useCallback(() => {
+    writeThemeMode(themeMode === "dark" ? "light" : "dark");
+  }, [themeMode]);
 
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <ParagliderWeatherDashboard />
+        <ParagliderWeatherDashboard
+          themeMode={themeMode}
+          toggleThemeMode={toggleThemeMode}
+        />
       </ThemeProvider>
     </QueryClientProvider>
   );
 }
 
-function ParagliderWeatherDashboard() {
+function ParagliderWeatherDashboard({
+  themeMode,
+  toggleThemeMode,
+}: {
+  themeMode: ThemeMode;
+  toggleThemeMode: () => void;
+}) {
   const [location, setLocation] = useState<LocationChoice | null>(null);
   const [activeTab, setActiveTab] = useState(0);
   const [locating, setLocating] = useState(false);
@@ -321,36 +485,7 @@ function ParagliderWeatherDashboard() {
   return (
     <Box
       component="main"
-      sx={{
-        minHeight: "100vh",
-        color: "text.primary",
-        background:
-          "radial-gradient(circle at 18% 0%, rgba(97, 244, 222, 0.2), transparent 26%), radial-gradient(circle at 78% 16%, rgba(255, 92, 122, 0.14), transparent 24%), linear-gradient(180deg, #04070f 0%, #07111f 48%, #03060d 100%)",
-        isolation: "isolate",
-        ...shellMotion,
-        "&::before": {
-          content: '""',
-          position: "fixed",
-          inset: 0,
-          zIndex: -2,
-          backgroundImage:
-            "linear-gradient(rgba(97,244,222,0.065) 1px, transparent 1px), linear-gradient(90deg, rgba(97,244,222,0.065) 1px, transparent 1px)",
-          backgroundSize: "42px 42px",
-          maskImage: "linear-gradient(180deg, rgba(0,0,0,0.9), rgba(0,0,0,0.18))",
-          animation: "gridDrift 22s linear infinite",
-        },
-        "&::after": {
-          content: '""',
-          position: "fixed",
-          inset: "-18% -10% auto -10%",
-          height: "64vh",
-          zIndex: -1,
-          background:
-            "radial-gradient(ellipse at 32% 38%, rgba(77,255,165,0.16), transparent 48%), radial-gradient(ellipse at 68% 24%, rgba(97,244,222,0.18), transparent 46%)",
-          filter: "blur(34px)",
-          animation: "aurora 12s ease-in-out infinite",
-        },
-      }}
+      sx={appShellSx}
     >
       <Box sx={{ mx: "auto", maxWidth: 1360, px: { xs: 2, md: 3 }, py: { xs: 2, md: 3 } }}>
         <Stack spacing={2.25}>
@@ -369,16 +504,14 @@ function ParagliderWeatherDashboard() {
             setLocationNotice={setLocationNotice}
             setSearchText={setSearchText}
             sourceChips={sourceChips}
+            themeMode={themeMode}
+            toggleThemeMode={toggleThemeMode}
           />
 
           {location && locationNotice ? (
             <Alert
               severity="warning"
-              sx={{
-                border: "1px solid rgba(255, 209, 102, 0.32)",
-                background: "rgba(255, 209, 102, 0.1)",
-                color: "#fff4cf",
-              }}
+              sx={alertSx("warning")}
             >
               {locationNotice}
             </Alert>
@@ -420,6 +553,8 @@ function HeaderPanel({
   setLocationNotice,
   setSearchText,
   sourceChips,
+  themeMode,
+  toggleThemeMode,
 }: {
   currentSnapshot?: CurrentSnapshot;
   isFetching: boolean;
@@ -435,7 +570,12 @@ function HeaderPanel({
   setLocationNotice: (value: string | null) => void;
   setSearchText: (value: string) => void;
   sourceChips: string[];
+  themeMode: ThemeMode;
+  toggleThemeMode: () => void;
 }) {
+  const themeToggleLabel =
+    themeMode === "dark" ? "Activează tema luminoasă" : "Activează tema întunecată";
+
   return (
     <PanelShell sx={{ p: { xs: 1.5, md: 2 }, minHeight: 184 }}>
       <Box
@@ -449,11 +589,48 @@ function HeaderPanel({
         }}
       >
         <Stack spacing={1.4}>
-          <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>
-            <Chip icon={<LogoMark size={18} />} size="small" label="Parapantabil OS" />
-            {sourceChips.map((source) => (
-              <Chip key={source} size="small" label={romanianSource(source)} />
-            ))}
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{ alignItems: "flex-start", justifyContent: "space-between" }}
+          >
+            <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap", minWidth: 0 }}>
+              <Chip icon={<LogoMark size={18} />} size="small" label="Parapantabil OS" />
+              {sourceChips.map((source) => (
+                <Chip key={source} size="small" label={romanianSource(source)} />
+              ))}
+            </Stack>
+            <Tooltip title={themeToggleLabel}>
+              <IconButton
+                aria-label={themeToggleLabel}
+                onClick={toggleThemeMode}
+                size="small"
+                sx={(theme) => ({
+                  flex: "0 0 auto",
+                  width: 38,
+                  height: 38,
+                  border: `1px solid ${alpha(theme.palette.primary.main, 0.28)}`,
+                  color: "primary.main",
+                  background:
+                    theme.palette.mode === "light"
+                      ? "rgba(255,255,255,0.72)"
+                      : "rgba(97,244,222,0.08)",
+                  boxShadow:
+                    theme.palette.mode === "light"
+                      ? "0 10px 24px rgba(7,52,74,0.12)"
+                      : "0 0 22px rgba(97,244,222,0.12)",
+                  "&:hover": {
+                    background: alpha(theme.palette.primary.main, 0.14),
+                  },
+                })}
+              >
+                {themeMode === "dark" ? (
+                  <LightModeIcon fontSize="small" />
+                ) : (
+                  <DarkModeIcon fontSize="small" />
+                )}
+              </IconButton>
+            </Tooltip>
           </Stack>
           <Box
             sx={{
@@ -522,11 +699,11 @@ function HeaderPanel({
                   startIcon={<RefreshIcon />}
                   onClick={refetchCurrent}
                   disabled={!location || isFetching}
-                  sx={{
-                    borderColor: "rgba(97,244,222,0.42)",
-                    color: "#dffcff",
-                    background: "rgba(97,244,222,0.05)",
-                  }}
+                  sx={(theme) => ({
+                    borderColor: alpha(theme.palette.primary.main, 0.42),
+                    color: theme.palette.mode === "light" ? "#075c63" : "#dffcff",
+                    background: alpha(theme.palette.primary.main, theme.palette.mode === "light" ? 0.07 : 0.05),
+                  })}
                 >
                   Recalibrează
                 </Button>
@@ -536,20 +713,38 @@ function HeaderPanel({
         </Stack>
 
         <Box
-          sx={{
-            border: "1px solid rgba(97,244,222,0.2)",
+          sx={(theme) => ({
+            border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
             borderRadius: 2,
             p: 1.25,
-            background: "rgba(1, 8, 18, 0.52)",
-            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.06)",
-          }}
+            background:
+              theme.palette.mode === "light"
+                ? "rgba(255,255,255,0.62)"
+                : "rgba(1, 8, 18, 0.52)",
+            boxShadow:
+              theme.palette.mode === "light"
+                ? "inset 0 1px 0 rgba(255,255,255,0.82)"
+                : "inset 0 1px 0 rgba(255,255,255,0.06)",
+          })}
         >
           <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 1 }}>
             <KeyboardCommandKeyIcon sx={{ color: "primary.main", fontSize: 18 }} />
-            <Typography variant="body2" sx={{ color: "#bfefff", fontWeight: 800 }}>
+            <Typography
+              variant="body2"
+              sx={(theme) => ({
+                color: theme.palette.mode === "light" ? "#075c63" : "#bfefff",
+                fontWeight: 800,
+              })}
+            >
               Comandă locație
             </Typography>
-            <Box sx={{ flex: 1, height: 1, background: "rgba(97,244,222,0.16)" }} />
+            <Box
+              sx={(theme) => ({
+                flex: 1,
+                height: 1,
+                background: alpha(theme.palette.primary.main, 0.16),
+              })}
+            />
             <Typography variant="body2" sx={{ color: "text.secondary" }}>
               minim 3 caractere
             </Typography>
@@ -662,7 +857,7 @@ function CurrentPanel({
 }) {
   if (queryError) {
     return (
-      <Alert severity="error" sx={darkAlertSx("error")}>
+      <Alert severity="error" sx={alertSx("error")}>
         Datele meteo live nu au putut fi încărcate: {queryError.message}
       </Alert>
     );
@@ -677,13 +872,16 @@ function CurrentPanel({
       {isFetching ? (
         <LinearProgress
           color="primary"
-          sx={{
+          sx={(theme) => ({
             borderRadius: 1,
-            background: "rgba(97,244,222,0.08)",
+            background: alpha(theme.palette.primary.main, 0.1),
             "& .MuiLinearProgress-bar": {
-              background: "linear-gradient(90deg, #61f4de, #4dffa5)",
+              background:
+                theme.palette.mode === "light"
+                  ? "linear-gradient(90deg, #087f82, #10b981)"
+                  : "linear-gradient(90deg, #61f4de, #4dffa5)",
             },
-          }}
+          })}
         />
       ) : null}
       <Box
@@ -727,7 +925,7 @@ function ForecastPanel({
   if (!active) return null;
   if (forecastQuery.error) {
     return (
-      <Alert severity="error" sx={darkAlertSx("error")}>
+      <Alert severity="error" sx={alertSx("error")}>
         Prognoza nu a putut fi încărcată: {forecastQuery.error.message}
       </Alert>
     );
@@ -790,7 +988,10 @@ function EmptyLocationPanel({
           <Chip
             icon={<LogoMark size={18} />}
             label="sistem în așteptare"
-            sx={{ alignSelf: "flex-start", color: "#bffcff" }}
+            sx={(theme) => ({
+              alignSelf: "flex-start",
+              color: theme.palette.mode === "light" ? "#075c63" : "#bffcff",
+            })}
           />
           <Box>
             <Typography variant="h2" component="h2" sx={{ fontSize: "2rem", overflowWrap: "anywhere" }}>
@@ -803,7 +1004,7 @@ function EmptyLocationPanel({
           </Box>
 
           {notice ? (
-            <Alert severity="info" sx={darkAlertSx("info")}>
+            <Alert severity="info" sx={alertSx("info")}>
               {notice}
             </Alert>
           ) : null}
@@ -892,7 +1093,10 @@ function DecisionDeck({
   title: string;
   verdict: FlightVerdict;
 }) {
-  const tone = toneByStatus[verdict.status];
+  const theme = useTheme();
+  const tone = statusTone(verdict.status, theme.palette.mode);
+  const cautionTone = statusTone("marginal", theme.palette.mode);
+  const isLight = theme.palette.mode === "light";
   const primaryReasons = verdict.reasons.length > 0 ? verdict.reasons : ["Nu există motive critice raportate."];
 
   return (
@@ -900,8 +1104,14 @@ function DecisionDeck({
       sx={{
         minHeight: 356,
         p: { xs: 1.6, md: 2.2 },
-        background: `${tone.gradient}, linear-gradient(145deg, rgba(10,20,38,0.94), rgba(5,11,24,0.78))`,
-        boxShadow: `0 32px 90px rgba(0,0,0,0.36), 0 0 64px ${tone.glow}`,
+        background: `${tone.gradient}, ${
+          isLight
+            ? "linear-gradient(145deg, rgba(255,255,255,0.92), rgba(235,249,251,0.78))"
+            : "linear-gradient(145deg, rgba(10,20,38,0.94), rgba(5,11,24,0.78))"
+        }`,
+        boxShadow: isLight
+          ? `0 32px 90px rgba(7,52,74,0.14), 0 0 56px ${tone.glow}`
+          : `0 32px 90px rgba(0,0,0,0.36), 0 0 64px ${tone.glow}`,
       }}
     >
       <Box
@@ -910,8 +1120,9 @@ function DecisionDeck({
           inset: 0,
           opacity: 0.7,
           pointerEvents: "none",
-          background:
-            "radial-gradient(circle at 18% 18%, rgba(255,255,255,0.11), transparent 20%), linear-gradient(180deg, transparent, rgba(0,0,0,0.2))",
+          background: isLight
+            ? "radial-gradient(circle at 18% 18%, rgba(255,255,255,0.62), transparent 20%), linear-gradient(180deg, transparent, rgba(8,127,130,0.08))"
+            : "radial-gradient(circle at 18% 18%, rgba(255,255,255,0.11), transparent 20%), linear-gradient(180deg, transparent, rgba(0,0,0,0.2))",
         }}
       />
       <Box
@@ -946,7 +1157,10 @@ function DecisionDeck({
               icon={<SensorsIcon />}
               label={eyebrow}
               size="small"
-              sx={{ color: "#dffcff", borderColor: "rgba(97,244,222,0.22)" }}
+              sx={{
+                color: isLight ? "#075c63" : "#dffcff",
+                borderColor: alpha(theme.palette.primary.main, 0.22),
+              }}
             />
             <Chip
               label={tone.label}
@@ -998,14 +1212,14 @@ function DecisionDeck({
               </RiskLine>
             ))}
             {verdict.cautions.slice(0, 2).map((reason) => (
-              <RiskLine key={reason} color="#ffd166">
+              <RiskLine key={reason} color={cautionTone.color}>
                 {reason}
               </RiskLine>
             ))}
           </Stack>
           <Box
             sx={{
-              borderTop: "1px solid rgba(255,255,255,0.1)",
+              borderTop: `1px solid ${alpha(theme.palette.text.primary, isLight ? 0.12 : 0.1)}`,
               pt: 1,
               color: "text.secondary",
             }}
@@ -1213,7 +1427,9 @@ function MetricTile({
   status: FlightStatus;
   value: string;
 }) {
-  const tone = toneByStatus[status];
+  const theme = useTheme();
+  const tone = statusTone(status, theme.palette.mode);
+  const isLight = theme.palette.mode === "light";
 
   return (
     <Box
@@ -1222,9 +1438,12 @@ function MetricTile({
         p: 1.5,
         border: `1px solid ${tone.dim}`,
         borderRadius: 2,
-        background:
-          "linear-gradient(145deg, rgba(12,24,43,0.74), rgba(4,10,22,0.66))",
-        boxShadow: `inset 0 1px 0 rgba(255,255,255,0.06), 0 12px 34px rgba(0,0,0,0.18)`,
+        background: isLight
+          ? "linear-gradient(145deg, rgba(255,255,255,0.76), rgba(232,247,250,0.66))"
+          : "linear-gradient(145deg, rgba(12,24,43,0.74), rgba(4,10,22,0.66))",
+        boxShadow: isLight
+          ? "inset 0 1px 0 rgba(255,255,255,0.78), 0 12px 34px rgba(7,52,74,0.1)"
+          : "inset 0 1px 0 rgba(255,255,255,0.06), 0 12px 34px rgba(0,0,0,0.18)",
         transition: "transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease",
         "&:hover": {
           transform: "translateY(-3px)",
@@ -1262,6 +1481,9 @@ function MetricTile({
 }
 
 function LaunchWindowScanner({ forecast }: { forecast: DayForecast }) {
+  const theme = useTheme();
+  const isLight = theme.palette.mode === "light";
+
   return (
     <PanelShell sx={{ p: { xs: 1.5, md: 2 } }}>
       <Stack spacing={1.5} sx={{ position: "relative", zIndex: 1 }}>
@@ -1273,13 +1495,13 @@ function LaunchWindowScanner({ forecast }: { forecast: DayForecast }) {
         </Stack>
 
         {forecast.topWindows.length === 0 ? (
-          <Alert severity="warning" sx={darkAlertSx("warning")}>
+          <Alert severity="warning" sx={alertSx("warning")}>
             Nicio oră cu lumină nu trece de filtrele conservatoare pentru vânt, vreme și vizibilitate.
           </Alert>
         ) : (
           <Stack spacing={1}>
             {forecast.topWindows.map(({ sample, verdict }) => {
-              const tone = toneByStatus[verdict.status];
+              const tone = statusTone(verdict.status, theme.palette.mode);
               return (
                 <Box
                   key={sample.time}
@@ -1291,7 +1513,7 @@ function LaunchWindowScanner({ forecast }: { forecast: DayForecast }) {
                     p: 1.25,
                     border: `1px solid ${tone.dim}`,
                     borderRadius: 2,
-                    background: "rgba(2, 10, 21, 0.54)",
+                    background: isLight ? "rgba(255,255,255,0.58)" : "rgba(2, 10, 21, 0.54)",
                     transition: "transform 180ms ease, border-color 180ms ease",
                     "&:hover": {
                       transform: "translateX(4px)",
@@ -1299,7 +1521,7 @@ function LaunchWindowScanner({ forecast }: { forecast: DayForecast }) {
                     },
                   }}
                 >
-                  <Typography sx={{ fontWeight: 900, color: "#effcff" }}>
+                  <Typography sx={{ fontWeight: 900, color: "text.primary" }}>
                     {formatTime(sample.time, forecast.timezone)}
                   </Typography>
                   <Box>
@@ -1311,7 +1533,7 @@ function LaunchWindowScanner({ forecast }: { forecast: DayForecast }) {
                         mt: 0.6,
                         height: 8,
                         borderRadius: 999,
-                        background: "rgba(255,255,255,0.08)",
+                        background: alpha(theme.palette.text.primary, isLight ? 0.08 : 0.08),
                         overflow: "hidden",
                       }}
                     >
@@ -1319,7 +1541,7 @@ function LaunchWindowScanner({ forecast }: { forecast: DayForecast }) {
                         sx={{
                           width: `${verdict.score}%`,
                           height: "100%",
-                          background: `linear-gradient(90deg, ${tone.color}, #61f4de)`,
+                          background: `linear-gradient(90deg, ${tone.color}, ${theme.palette.primary.main})`,
                           boxShadow: `0 0 18px ${tone.glow}`,
                         }}
                       />
@@ -1342,7 +1564,9 @@ function LaunchWindowScanner({ forecast }: { forecast: DayForecast }) {
 }
 
 function ScoreOrb({ score, status }: { score: number; status: FlightStatus }) {
-  const tone = toneByStatus[status];
+  const theme = useTheme();
+  const tone = statusTone(status, theme.palette.mode);
+  const isLight = theme.palette.mode === "light";
   const angle = Math.max(0, Math.min(360, Math.round(score * 3.6)));
 
   return (
@@ -1357,16 +1581,22 @@ function ScoreOrb({ score, status }: { score: number; status: FlightStatus }) {
         placeItems: "center",
         mx: { xs: 0, sm: "auto" },
         position: "relative",
-        background: `conic-gradient(${tone.color} 0deg ${angle}deg, rgba(255,255,255,0.08) ${angle}deg 360deg)`,
+        background: `conic-gradient(${tone.color} 0deg ${angle}deg, ${alpha(
+          theme.palette.text.primary,
+          isLight ? 0.1 : 0.08,
+        )} ${angle}deg 360deg)`,
         boxShadow: `0 0 48px ${tone.glow}`,
         "&::before": {
           content: '""',
           position: "absolute",
           inset: 10,
           borderRadius: "50%",
-          background:
-            "radial-gradient(circle at 50% 30%, rgba(255,255,255,0.12), transparent 28%), #06101f",
-          boxShadow: "inset 0 0 28px rgba(0,0,0,0.6)",
+          background: isLight
+            ? "radial-gradient(circle at 50% 30%, rgba(255,255,255,0.76), transparent 28%), #eefbff"
+            : "radial-gradient(circle at 50% 30%, rgba(255,255,255,0.12), transparent 28%), #06101f",
+          boxShadow: isLight
+            ? "inset 0 0 28px rgba(8,127,130,0.14)"
+            : "inset 0 0 28px rgba(0,0,0,0.6)",
         },
         "&::after": {
           content: '""',
@@ -1393,6 +1623,8 @@ function ScoreOrb({ score, status }: { score: number; status: FlightStatus }) {
 }
 
 function WindDial({ sample }: { sample: WeatherSample }) {
+  const theme = useTheme();
+  const isLight = theme.palette.mode === "light";
   const rotation = sample.windDirection ?? 0;
   const status: FlightStatus =
     sample.windSpeed !== null && sample.windSpeed >= 8 && sample.windSpeed <= 22
@@ -1400,7 +1632,7 @@ function WindDial({ sample }: { sample: WeatherSample }) {
       : sample.windSpeed !== null && sample.windSpeed > 28
         ? "no-go"
         : "marginal";
-  const tone = toneByStatus[status];
+  const tone = statusTone(status, theme.palette.mode);
 
   return (
     <Box
@@ -1410,10 +1642,13 @@ function WindDial({ sample }: { sample: WeatherSample }) {
         width: 190,
         height: 190,
         borderRadius: "50%",
-        border: "1px solid rgba(141,245,255,0.22)",
-        background:
-          "radial-gradient(circle at 50% 50%, rgba(97,244,222,0.14), rgba(2,8,18,0.86) 58%), conic-gradient(from 0deg, rgba(97,244,222,0.22), rgba(255,209,102,0.14), rgba(255,92,122,0.12), rgba(97,244,222,0.22))",
-        boxShadow: `0 0 42px ${tone.glow}, inset 0 0 34px rgba(0,0,0,0.46)`,
+        border: `1px solid ${alpha(theme.palette.primary.main, 0.22)}`,
+        background: isLight
+          ? "radial-gradient(circle at 50% 50%, rgba(8,127,130,0.12), rgba(255,255,255,0.88) 58%), conic-gradient(from 0deg, rgba(8,127,130,0.2), rgba(255,209,102,0.18), rgba(190,18,60,0.1), rgba(8,127,130,0.2))"
+          : "radial-gradient(circle at 50% 50%, rgba(97,244,222,0.14), rgba(2,8,18,0.86) 58%), conic-gradient(from 0deg, rgba(97,244,222,0.22), rgba(255,209,102,0.14), rgba(255,92,122,0.12), rgba(97,244,222,0.22))",
+        boxShadow: isLight
+          ? `0 0 42px ${tone.glow}, inset 0 0 34px rgba(8,127,130,0.12)`
+          : `0 0 42px ${tone.glow}, inset 0 0 34px rgba(0,0,0,0.46)`,
         display: "grid",
         placeItems: "center",
         position: "relative",
@@ -1425,7 +1660,7 @@ function WindDial({ sample }: { sample: WeatherSample }) {
           key={point}
           variant="body2"
           sx={{
-            color: "#dffcff",
+            color: isLight ? "#075c63" : "#dffcff",
             fontWeight: 900,
             position: "absolute",
             top: point === "N" ? 12 : point === "S" ? "auto" : "50%",
@@ -1467,7 +1702,7 @@ function WindDial({ sample }: { sample: WeatherSample }) {
         <Typography variant="h3" sx={{ color: tone.color, fontSize: "1.55rem" }}>
           {windDirectionLabel(sample.windDirection)}
         </Typography>
-        <Typography variant="body2" sx={{ color: "#c5d8e8" }}>
+        <Typography variant="body2" sx={{ color: "text.secondary" }}>
           {numberLabel(sample.windSpeed, "km/h")}
         </Typography>
       </Stack>
@@ -1488,14 +1723,17 @@ function SignalMini({
 }) {
   return (
     <Box
-      sx={{
+      sx={(theme) => ({
         minWidth: compact ? 118 : "auto",
         minHeight: compact ? 58 : 74,
         p: compact ? 0.9 : 1.1,
-        border: "1px solid rgba(141,245,255,0.14)",
+        border: `1px solid ${alpha(theme.palette.primary.main, 0.14)}`,
         borderRadius: 2,
-        background: "rgba(255,255,255,0.045)",
-      }}
+        background:
+          theme.palette.mode === "light"
+            ? "rgba(255,255,255,0.54)"
+            : "rgba(255,255,255,0.045)",
+      })}
     >
       <Stack direction="row" spacing={0.85} sx={{ alignItems: "center" }}>
         <Box sx={{ color: "primary.main", display: "grid", placeItems: "center" }}>{icon}</Box>
@@ -1513,13 +1751,16 @@ function SignalMini({
 function MiniMetric({ label, value }: { label: string; value: string }) {
   return (
     <Box
-      sx={{
+      sx={(theme) => ({
         minHeight: 78,
         p: 1.15,
-        border: "1px solid rgba(141,245,255,0.14)",
+        border: `1px solid ${alpha(theme.palette.primary.main, 0.14)}`,
         borderRadius: 2,
-        background: "rgba(255,255,255,0.045)",
-      }}
+        background:
+          theme.palette.mode === "light"
+            ? "rgba(255,255,255,0.54)"
+            : "rgba(255,255,255,0.045)",
+      })}
     >
       <Typography variant="body2" sx={{ color: "text.secondary" }}>
         {label}
@@ -1545,7 +1786,7 @@ function RiskLine({
 }
 
 function PanelShell({ children, sx = {} }: { children: ReactNode; sx?: object }) {
-  return <Box sx={{ ...glassPanel, ...sx }}>{children}</Box>;
+  return <Box sx={(theme) => ({ ...glassPanel(theme), ...sx })}>{children}</Box>;
 }
 
 function LogoMark({ size = 24 }: { size?: number }) {
@@ -1569,7 +1810,7 @@ function LogoBeacon() {
   return (
     <Box
       aria-hidden="true"
-      sx={{
+      sx={(theme) => ({
         width: { xs: 76, sm: 96 },
         height: { xs: 76, sm: 96 },
         borderRadius: "50%",
@@ -1577,18 +1818,23 @@ function LogoBeacon() {
         placeItems: "center",
         position: "relative",
         background:
-          "radial-gradient(circle at 50% 50%, rgba(97,244,222,0.16), rgba(2,8,18,0.82) 68%)",
-        boxShadow: "0 0 34px rgba(97,244,222,0.24), inset 0 0 22px rgba(0,0,0,0.55)",
+          theme.palette.mode === "light"
+            ? "radial-gradient(circle at 50% 50%, rgba(8,127,130,0.14), rgba(255,255,255,0.84) 68%)"
+            : "radial-gradient(circle at 50% 50%, rgba(97,244,222,0.16), rgba(2,8,18,0.82) 68%)",
+        boxShadow:
+          theme.palette.mode === "light"
+            ? "0 0 34px rgba(8,127,130,0.18), inset 0 0 22px rgba(8,127,130,0.12)"
+            : "0 0 34px rgba(97,244,222,0.24), inset 0 0 22px rgba(0,0,0,0.55)",
         "&::before": {
           content: '""',
           position: "absolute",
           inset: -6,
           borderRadius: "50%",
-          border: "1px solid rgba(97,244,222,0.28)",
-          borderTopColor: "rgba(255,209,102,0.72)",
+          border: `1px solid ${alpha(theme.palette.primary.main, 0.28)}`,
+          borderTopColor: alpha(theme.palette.secondary.main, 0.72),
           animation: "orbit 11s linear infinite",
         },
-      }}
+      })}
     >
       <Box
         component="img"
@@ -1641,6 +1887,14 @@ function DashboardSkeleton() {
 }
 
 function HolographicLaunchMap() {
+  const theme = useTheme();
+  const isLight = theme.palette.mode === "light";
+  const primary = isLight ? "#087f82" : "#61f4de";
+  const success = isLight ? "#10b981" : "#4dffa5";
+  const sun = isLight ? "#d97706" : "#ffd166";
+  const panelMid = isLight ? "#dff8f8" : "#0b2634";
+  const panelEnd = isLight ? "#f8fdff" : "#020812";
+
   return (
     <Box
       aria-hidden="true"
@@ -1659,33 +1913,35 @@ function HolographicLaunchMap() {
           width: "min(100%, 680px)",
           height: "auto",
           maxHeight: 520,
-          filter: "drop-shadow(0 30px 60px rgba(0,0,0,0.34))",
+          filter: isLight
+            ? "drop-shadow(0 30px 60px rgba(7,52,74,0.16))"
+            : "drop-shadow(0 30px 60px rgba(0,0,0,0.34))",
         }}
       >
         <defs>
           <linearGradient id="holoWing" x1="0" x2="1">
-            <stop offset="0%" stopColor="#61f4de" />
-            <stop offset="52%" stopColor="#4dffa5" />
-            <stop offset="100%" stopColor="#ffd166" />
+            <stop offset="0%" stopColor={primary} />
+            <stop offset="52%" stopColor={success} />
+            <stop offset="100%" stopColor={sun} />
           </linearGradient>
           <radialGradient id="holoGlow" cx="50%" cy="35%" r="65%">
-            <stop offset="0%" stopColor="#61f4de" stopOpacity="0.32" />
-            <stop offset="55%" stopColor="#0b2634" stopOpacity="0.72" />
-            <stop offset="100%" stopColor="#020812" stopOpacity="0.92" />
+            <stop offset="0%" stopColor={primary} stopOpacity={isLight ? "0.18" : "0.32"} />
+            <stop offset="55%" stopColor={panelMid} stopOpacity={isLight ? "0.78" : "0.72"} />
+            <stop offset="100%" stopColor={panelEnd} stopOpacity={isLight ? "0.92" : "0.92"} />
           </radialGradient>
         </defs>
-        <rect x="18" y="22" width="644" height="476" rx="34" fill="url(#holoGlow)" stroke="#61f4de" strokeOpacity="0.22" />
-        <path d="M24 394 L130 282 L198 348 L270 236 L346 354 L420 268 L504 374 L656 298 L656 498 L24 498 Z" fill="#61f4de" opacity="0.08" />
-        <path d="M34 418 L138 326 L230 382 L330 284 L450 408 L560 344 L656 390" fill="none" stroke="#61f4de" strokeOpacity="0.32" strokeWidth="2" />
-        <path d="M82 438 C188 398 260 410 360 374 C460 338 534 364 618 318" fill="none" stroke="#4dffa5" strokeOpacity="0.2" strokeWidth="2" strokeDasharray="8 12" />
-        <circle cx="530" cy="116" r="44" fill="#ffd166" opacity="0.72" />
+        <rect x="18" y="22" width="644" height="476" rx="34" fill="url(#holoGlow)" stroke={primary} strokeOpacity="0.22" />
+        <path d="M24 394 L130 282 L198 348 L270 236 L346 354 L420 268 L504 374 L656 298 L656 498 L24 498 Z" fill={primary} opacity={isLight ? "0.1" : "0.08"} />
+        <path d="M34 418 L138 326 L230 382 L330 284 L450 408 L560 344 L656 390" fill="none" stroke={primary} strokeOpacity={isLight ? "0.42" : "0.32"} strokeWidth="2" />
+        <path d="M82 438 C188 398 260 410 360 374 C460 338 534 364 618 318" fill="none" stroke={success} strokeOpacity={isLight ? "0.28" : "0.2"} strokeWidth="2" strokeDasharray="8 12" />
+        <circle cx="530" cy="116" r="44" fill={sun} opacity="0.72" />
 
         {[210, 282, 354, 426].map((x, index) => (
           <path
             key={x}
             d={`M${x} 430 C${x - 34} 358 ${x + 30} 322 ${x} 248`}
             fill="none"
-            stroke={index % 2 ? "#4dffa5" : "#61f4de"}
+            stroke={index % 2 ? success : primary}
             strokeLinecap="round"
             strokeWidth="3"
             strokeDasharray="10 14"
@@ -1703,14 +1959,16 @@ function HolographicLaunchMap() {
           style={{
             animation: "floatWing 6.6s ease-in-out infinite",
             filter:
-              "drop-shadow(0 0 32px rgba(97,244,222,0.44)) drop-shadow(0 20px 36px rgba(0,0,0,0.36))",
+              isLight
+                ? "drop-shadow(0 0 26px rgba(8,127,130,0.28)) drop-shadow(0 20px 36px rgba(7,52,74,0.18))"
+                : "drop-shadow(0 0 32px rgba(97,244,222,0.44)) drop-shadow(0 20px 36px rgba(0,0,0,0.36))",
           }}
         />
 
         <g opacity="0.55">
-          <circle cx="348" cy="288" r="140" fill="none" stroke="#61f4de" strokeOpacity="0.22" />
-          <circle cx="348" cy="288" r="204" fill="none" stroke="#61f4de" strokeOpacity="0.12" />
-          <path d="M348 84 L348 492 M144 288 L552 288" stroke="#61f4de" strokeOpacity="0.14" />
+          <circle cx="348" cy="288" r="140" fill="none" stroke={primary} strokeOpacity={isLight ? "0.28" : "0.22"} />
+          <circle cx="348" cy="288" r="204" fill="none" stroke={primary} strokeOpacity={isLight ? "0.16" : "0.12"} />
+          <path d="M348 84 L348 492 M144 288 L552 288" stroke={primary} strokeOpacity={isLight ? "0.18" : "0.14"} />
         </g>
       </Box>
     </Box>
@@ -1733,16 +1991,23 @@ function distanceLabel(value: number | null) {
   }).format(value / 1000)} km`;
 }
 
-function darkAlertSx(kind: "error" | "info" | "warning") {
-  const color =
-    kind === "error" ? "#ff5c7a" : kind === "warning" ? "#ffd166" : "#61f4de";
-  return {
-    border: `1px solid ${color}`,
-    background: `${color}18`,
-    color: "#f5fbff",
+function alertSx(kind: "error" | "info" | "warning") {
+  return (theme: Theme) => {
+    const color =
+      kind === "error"
+        ? theme.palette.error.main
+        : kind === "warning"
+          ? theme.palette.warning.main
+          : theme.palette.primary.main;
+
+    return {
+      border: `1px solid ${color}`,
+      background: alpha(color, theme.palette.mode === "light" ? 0.12 : 0.1),
+      color: theme.palette.text.primary,
+    };
   };
 }
 
-const skeletonSx = {
-  bgcolor: "rgba(255,255,255,0.08)",
-};
+const skeletonSx = (theme: Theme) => ({
+  bgcolor: alpha(theme.palette.text.primary, theme.palette.mode === "light" ? 0.08 : 0.08),
+});

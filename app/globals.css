@@ -1,6 +1,19 @@
 :root {
   --background: #04070f;
   --foreground: #f5fbff;
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --background: #f6fbff;
+  --foreground: #102033;
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --background: #04070f;
+  --foreground: #f5fbff;
+  color-scheme: dark;
 }
 
 * {
@@ -9,7 +22,6 @@
 
 html {
   background: var(--background);
-  color-scheme: dark;
 }
 
 body {
@@ -29,4 +41,9 @@ a {
 ::selection {
   background: rgba(97, 244, 222, 0.32);
   color: #ffffff;
+}
+
+:root[data-theme="light"] ::selection {
+  background: rgba(8, 127, 130, 0.22);
+  color: #102033;
 }
